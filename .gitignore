@@ -1,5 +1,6 @@
 # Authentication session (stored in GitHub Repository Secrets AUTH_JSON)
 auth.json
+browser_profile/
 
 # Local logs and screenshots
 logs/

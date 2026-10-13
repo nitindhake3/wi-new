@@ -31,8 +31,13 @@ STEALTH_INIT_SCRIPT = """
     Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
 """
 
+BROWSER_PROFILE_DIR = Path("browser_profile")
+
 def is_auth_valid(auth_path: Path = AUTH_FILE) -> bool:
-    """Checks whether the auth.json file exists and contains stored cookies/origins."""
+    """Checks whether either the browser_profile exists or auth.json contains stored cookies."""
+    if (BROWSER_PROFILE_DIR / "Default").exists():
+        return True
+
     if not auth_path.exists():
         logger.warning(f"Auth file '{auth_path}' does not exist.")
         return False
@@ -57,33 +62,41 @@ def is_auth_valid(auth_path: Path = AUTH_FILE) -> bool:
 def setup_auth(auth_path: Path = AUTH_FILE, target_url: str = "https://accounts.google.com") -> bool:
     """
     Launches a headful browser for the user to log into their Google account.
-    Saves the browser storage state to auth.json upon user confirmation.
+    Saves the permanent profile to browser_profile/ and exports storage state to auth.json.
     """
     logger.info("=== Starting One-Time Google Authentication Setup ===")
     logger.info("A browser window will open. Please log into your Google Account.")
 
-    with sync_playwright() as p:
-        # Launch interactive headful browser with stealth settings
-        browser = p.chromium.launch(
-            headless=False,
-            args=CHROMIUM_ARGS
-        )
-        context = browser.new_context(
-            user_agent=DEFAULT_USER_AGENT,
-            viewport={"width": 1280, "height": 800},
-            locale="en-US",
-            timezone_id="Asia/Kolkata",
-            extra_http_headers={
-                "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "accept-language": "en-US,en;q=0.9"
-            }
-        )
-        context.add_init_script(STEALTH_INIT_SCRIPT)
-        page = context.new_page()
+    BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-        page.goto(target_url, wait_until="networkidle")
+    with sync_playwright() as p:
+        try:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(BROWSER_PROFILE_DIR.resolve()),
+                channel="chrome",
+                headless=False,
+                args=CHROMIUM_ARGS,
+                viewport={"width": 1280, "height": 800},
+                locale="en-US",
+                timezone_id="Asia/Kolkata",
+            )
+        except Exception:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=str(BROWSER_PROFILE_DIR.resolve()),
+                headless=False,
+                args=CHROMIUM_ARGS,
+                viewport={"width": 1280, "height": 800},
+                locale="en-US",
+                timezone_id="Asia/Kolkata",
+            )
+
+        context.add_init_script(STEALTH_INIT_SCRIPT)
+        page = context.pages[0] if context.pages else context.new_page()
+
+        try:
+            page.goto(target_url, wait_until="domcontentloaded", timeout=60000)
+        except Exception as e:
+            logger.warning(f"Initial navigation notice: {e}")
 
         print("\n" + "=" * 70)
         print("ACTION REQUIRED: Log into your Google Account in the opened browser window.")
@@ -95,7 +108,7 @@ def setup_auth(auth_path: Path = AUTH_FILE, target_url: str = "https://accounts.
             input("Press ENTER when login is complete...")
         except KeyboardInterrupt:
             logger.warning("Authentication setup cancelled by user.")
-            browser.close()
+            context.close()
             return False
 
         # Navigate to target form URL if available to ensure docs.google.com cookies are generated
@@ -111,17 +124,22 @@ def setup_auth(auth_path: Path = AUTH_FILE, target_url: str = "https://accounts.
             except Exception as e:
                 logger.warning(f"Could not load form URL during auth setup: {e}")
 
-        # Save storage state
-        context.storage_state(path=str(auth_path))
-        browser.close()
+        # Save storage state to auth.json as well
+        try:
+            context.storage_state(path=str(auth_path))
+        except Exception as e:
+            logger.warning(f"Could not export storage_state: {e}")
+
+        context.close()
 
     if is_auth_valid(auth_path):
-        logger.info(f"SUCCESS: Authentication session saved to '{auth_path}'.")
-        print(f"\nAuthentication session successfully saved to '{auth_path}'.")
-        print("You can now run the scheduler or submit forms automatically!\n")
+        logger.info(f"SUCCESS: Persistent profile and authentication session saved.")
+        print(f"\nAuthentication session successfully saved!")
+        print("Your browser session is permanently saved in 'browser_profile/' and 'auth.json'.")
+        print("You can now run the bot or scheduler locally!\n")
         return True
     else:
-        logger.error(f"FAILURE: Authentication file '{auth_path}' was not saved correctly.")
+        logger.error(f"FAILURE: Authentication was not saved correctly.")
         return False
 
 if __name__ == "__main__":

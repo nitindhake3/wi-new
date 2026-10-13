@@ -337,27 +337,57 @@ class FormHandler:
 
         resolved_answers = self.config.get_resolved_answers()
 
+        profile_dir = Path("browser_profile")
+        use_persistent_profile = (profile_dir / "Default").exists()
+        browser = None
+        context = None
+
         with sync_playwright() as p:
-            logger.info(f"Launching Playwright browser (headless={headless}) with saved auth & stealth settings...")
-            browser = p.chromium.launch(
-                headless=headless,
-                args=CHROMIUM_ARGS
-            )
-            context = browser.new_context(
-                storage_state=str(self.auth_file),
-                user_agent=DEFAULT_USER_AGENT,
-                viewport={"width": 1280, "height": 900},
-                locale="en-US",
-                timezone_id="Asia/Kolkata",
-                extra_http_headers={
-                    "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-                    "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": '"Windows"',
-                    "accept-language": "en-US,en;q=0.9"
-                }
-            )
-            context.add_init_script(STEALTH_INIT_SCRIPT)
-            page = context.new_page()
+            if use_persistent_profile:
+                logger.info(f"Launching persistent Chrome profile from '{profile_dir}' (headless={headless})...")
+                try:
+                    context = p.chromium.launch_persistent_context(
+                        user_data_dir=str(profile_dir.resolve()),
+                        channel="chrome",
+                        headless=headless,
+                        args=CHROMIUM_ARGS,
+                        viewport={"width": 1280, "height": 900},
+                        locale="en-US",
+                        timezone_id="Asia/Kolkata",
+                    )
+                except Exception as e:
+                    logger.warning(f"Chrome channel unavailable, using bundled chromium: {e}")
+                    context = p.chromium.launch_persistent_context(
+                        user_data_dir=str(profile_dir.resolve()),
+                        headless=headless,
+                        args=CHROMIUM_ARGS,
+                        viewport={"width": 1280, "height": 900},
+                        locale="en-US",
+                        timezone_id="Asia/Kolkata",
+                    )
+                context.add_init_script(STEALTH_INIT_SCRIPT)
+                page = context.pages[0] if context.pages else context.new_page()
+            else:
+                logger.info(f"Launching Playwright browser with auth.json (headless={headless})...")
+                browser = p.chromium.launch(
+                    headless=headless,
+                    args=CHROMIUM_ARGS
+                )
+                context = browser.new_context(
+                    storage_state=str(self.auth_file) if self.auth_file.exists() else None,
+                    user_agent=DEFAULT_USER_AGENT,
+                    viewport={"width": 1280, "height": 900},
+                    locale="en-US",
+                    timezone_id="Asia/Kolkata",
+                    extra_http_headers={
+                        "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+                        "sec-ch-ua-mobile": "?0",
+                        "sec-ch-ua-platform": '"Windows"',
+                        "accept-language": "en-US,en;q=0.9"
+                    }
+                )
+                context.add_init_script(STEALTH_INIT_SCRIPT)
+                page = context.new_page()
 
             try:
                 logger.info(f"Navigating to Google Form URL: {self.config.form_url}")
@@ -478,7 +508,10 @@ class FormHandler:
                 self._take_screenshot(page, "unexpected_error")
                 raise FormSubmissionError(f"Unexpected error: {e}")
             finally:
-                browser.close()
+                if use_persistent_profile and context:
+                    context.close()
+                elif browser:
+                    browser.close()
 
     def submit_form_with_retry(self, max_retries: int = 3, headless: bool = True) -> bool:
         """Attempts form submission up to max_retries times with delays between retries."""

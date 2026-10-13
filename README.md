@@ -77,40 +77,37 @@ python main.py --setup-auth
 
 ---
 
-### Step 5: Add Secrets to GitHub Repository Secrets
+### 💻 Local Automated Daily Submission (Recommended for 100% Reliability)
 
-1. Run the secret helper script in your terminal to get your session cookie:
-   ```bash
-   python print_secret.py
-   ```
-2. Copy the single-line Base64 secret text printed on your screen.
-3. Open your repository on **GitHub.com** ➔ **Settings** ➔ **Secrets and variables** ➔ **Actions**.
-4. Click **New repository secret**:
-   - **Name**: `AUTH_JSON`
-   - **Value**: Paste your copied Base64 secret string.
-5. *(Highly Recommended)* Add your Google Account password so the bot can **auto-reauthenticate** whenever Google session cookies expire:
-   - **Name**: `AUTH_PASSWORD`
-   - **Value**: Your `@kalvium.community` account password.
-   *(This enables the bot to automatically click your account and solve the Google password challenge on GitHub Actions runners without failing!)*
+To run the automation locally on your laptop automatically without any Google Cloud session expirations:
 
----
+1. **One-Time Login**:
+   Double-click `login_setup.bat` (or run `python main.py --setup-auth`).
+   - A browser window opens.
+   - Log into your `nitin.dhake.s73@kalvium.community` Google Account.
+   - Return to the terminal and press **ENTER**.
+   - Your session is permanently saved to `browser_profile/`.
 
-### Step 6: Enable & Test your GitHub Action Workflow
+2. **Register Daily Windows Schedule**:
+   Double-click `setup_windows_scheduler.bat`.
+   - Automatically registers `DailyKalviumWIFormBot` in Windows Task Scheduler.
+   - Runs every day at **11:00 AM IST** silently in the background (`pythonw.exe`).
+   - Automatically catches up if your laptop was closed/off at 11:00 AM when you next power on!
 
-1. Go to the **Actions** tab on your GitHub repository.
-2. Select **Daily Google Form Auto-Fill Bot** from the left sidebar.
-3. Click **Run workflow** ➔ **Run workflow** to test submission immediately.
+3. **Manual / Instant Test**:
+   Double-click `run_bot.bat` anytime to test immediate form submission.
 
 ---
 
-### 💻 Bonus: Automated Local Daily Submission (Windows Task Scheduler)
+### ☁️ Cloud GitHub Actions Daily Submission (Optional Alternative)
 
-If you also want your laptop to automatically submit the form locally every day at 11:00 AM IST (zero cloud session issues):
-1. Double-click or run:
-   ```cmd
-   setup_windows_scheduler.bat
-   ```
-2. That's it! Windows will automatically execute the bot every day at 11:00 AM IST. If your laptop was closed/off at 11:00 AM, the bot will automatically detect the missed submission and catch up when you boot.
+If you also want GitHub Actions to run the bot in the cloud at 11:00 AM:
+
+1. Run `python print_secret.py` to copy your Base64 cookie string.
+2. In GitHub ➔ **Settings** ➔ **Secrets and variables** ➔ **Actions**, add:
+   - `AUTH_JSON`: Pasted Base64 string.
+   - `AUTH_PASSWORD`: Your Google account password *(enables automated re-authentication if cookies expire)*.
+3. In GitHub ➔ **Actions**, click **Daily Google Form Auto-Fill Bot** ➔ **Run workflow**.
 
 ---
 
