@@ -45,6 +45,7 @@ jobs:
       - name: Run Form Submission Bot
         env:
           GOOGLE_EMAIL: ${{ secrets.GOOGLE_EMAIL || 'nitin.dhake.s73@kalvium.community' }}
+          AUTH_PASSWORD: ${{ secrets.AUTH_PASSWORD }}
         run: |
           python main.py --run-now
 

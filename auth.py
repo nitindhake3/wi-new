@@ -102,8 +102,12 @@ def setup_auth(auth_path: Path = AUTH_FILE, target_url: str = "https://accounts.
         if target_url and "docs.google.com" in target_url:
             try:
                 logger.info("Navigating to Google Form to capture form-specific session state...")
-                page.goto(target_url, wait_until="networkidle", timeout=30000)
-                time.sleep(2)
+                page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                time.sleep(3)
             except Exception as e:
                 logger.warning(f"Could not load form URL during auth setup: {e}")
 

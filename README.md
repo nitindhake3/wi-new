@@ -79,39 +79,47 @@ python main.py --setup-auth
 
 ### Step 5: Add Secrets to GitHub Repository Secrets
 
-1. Run the secret helper script in your terminal:
+1. Run the secret helper script in your terminal to get your session cookie:
    ```bash
    python print_secret.py
    ```
 2. Copy the single-line Base64 secret text printed on your screen.
-3. Open your forked repository on **GitHub.com**.
-4. Go to **Settings** ➔ **Secrets and variables** ➔ **Actions**.
-5. Click **New repository secret**:
+3. Open your repository on **GitHub.com** ➔ **Settings** ➔ **Secrets and variables** ➔ **Actions**.
+4. Click **New repository secret**:
    - **Name**: `AUTH_JSON`
-   - **Value**: Paste your copied secret string.
+   - **Value**: Paste your copied Base64 secret string.
+5. *(Highly Recommended)* Add your Google Account password so the bot can **auto-reauthenticate** whenever Google session cookies expire:
+   - **Name**: `AUTH_PASSWORD`
+   - **Value**: Your `@kalvium.community` account password.
+   *(This enables the bot to automatically click your account and solve the Google password challenge on GitHub Actions runners without failing!)*
 
 ---
 
 ### Step 6: Enable & Test your GitHub Action Workflow
 
 1. Go to the **Actions** tab on your GitHub repository.
-2. If GitHub prompts you with *"Workflows are disabled"*, click **I understand my workflows, go ahead and enable them**.
-3. Select **Daily Google Form Auto-Fill Bot** from the left sidebar.
-4. Click **Run workflow** ➔ **Run workflow** to submit immediately for a manual test. Normal weekday submissions are started by the schedule; pushing code does not submit the form.
-
-🎉 **Congratulations!** Your bot will now be scheduled every **Monday through Friday at 11:00 AM IST** in the cloud. You can turn off your laptop. Keep the `AUTH_JSON` secret current; if Google expires the saved session, create a fresh login state and update the secret.
+2. Select **Daily Google Form Auto-Fill Bot** from the left sidebar.
+3. Click **Run workflow** ➔ **Run workflow** to test submission immediately.
 
 ---
 
-#### Command / Action to re-autenticate 
-1.	python main.py --setup-auth
-2.	Log into your @kalvium.community account
-3.	Press ENTER in the terminal
-4.	python main.py --run-now
-5.	python print_secret.py
-6.	Copy the Base64 output
-7.	Update the AUTH_JSON GitHub Secret
-8.	Re-run daily_form.yml
+### 💻 Bonus: Automated Local Daily Submission (Windows Task Scheduler)
+
+If you also want your laptop to automatically submit the form locally every day at 11:00 AM IST (zero cloud session issues):
+1. Double-click or run:
+   ```cmd
+   setup_windows_scheduler.bat
+   ```
+2. That's it! Windows will automatically execute the bot every day at 11:00 AM IST. If your laptop was closed/off at 11:00 AM, the bot will automatically detect the missed submission and catch up when you boot.
+
+---
+
+#### Quick Command to Re-Authenticate Manually (if not using AUTH_PASSWORD)
+1. `python main.py --setup-auth`
+2. Log into your `@kalvium.community` account in the browser that opens
+3. Press **ENTER** in the terminal
+4. `python print_secret.py`
+5. Update `AUTH_JSON` in GitHub Secrets
 
 
 ## THE QUESTION'S WILL GET IN YOUR MIND❓ (FAQ)

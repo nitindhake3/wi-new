@@ -77,7 +77,7 @@ class FormHandler:
 
         logger.info(f"Attempting automated Google re-authentication for account '{target_email or 'Unknown'}'...")
 
-        for attempt in range(6):
+        for attempt in range(8):
             url = page.url
             if "docs.google.com/forms" in url and "accounts.google.com" not in url:
                 logger.info("Re-authentication successful! Back on Google Form URL.")
@@ -94,44 +94,51 @@ class FormHandler:
             # 1. Check Account Chooser screen FIRST (Account selection)
             account_btn = None
             if target_email:
-                btn_match = page.locator(
-                    f"div[data-identifier='{target_email}'], "
-                    f"div:has-text('{target_email}'), "
-                    f"li:has-text('{target_email}'), "
-                    f"div[data-email='{target_email}']"
-                )
-                if btn_match.count() > 0 and btn_match.last.is_visible():
-                    account_btn = btn_match.last
+                li_match = page.locator(f"li:has-text('{target_email}')")
+                if li_match.count() > 0 and li_match.first.is_visible():
+                    account_btn = li_match.first
+                else:
+                    role_match = page.locator(
+                        f"div[role='link']:has-text('{target_email}'), "
+                        f"div[data-identifier='{target_email}'], "
+                        f"div[data-email='{target_email}']"
+                    )
+                    if role_match.count() > 0 and role_match.first.is_visible():
+                        account_btn = role_match.first
 
             if not account_btn:
-                fallback_match = page.locator("div[data-identifier], div.wL32ec, div.Jh9pfc")
+                fallback_match = page.locator("li:has-text('@'), div[data-identifier], div.wL32ec")
                 if fallback_match.count() > 0 and fallback_match.first.is_visible():
                     account_btn = fallback_match.first
 
             if account_btn and account_btn.is_visible():
-                logger.info("Found account item on Account Chooser screen. Clicking account...")
+                logger.info("Found account item on Account Chooser screen. Clicking account row...")
                 try:
                     account_btn.click()
                     time.sleep(3)
-                    page.wait_for_load_state("domcontentloaded")
+                    try:
+                        page.wait_for_load_state("domcontentloaded", timeout=10000)
+                    except Exception:
+                        pass
                     continue
                 except Exception as e:
                     logger.warning(f"Failed to click account item: {e}")
 
             # 2. Check Password Field
-            pwd_inp = page.locator("input[type='password'], input[name='Passwd'], input[name='password']")
+            pwd_inp = page.locator("input[type='password'], input[name='Passwd'], input[name='password'], #password input")
             if pwd_inp.count() > 0 and pwd_inp.first.is_visible():
                 if not password:
                     logger.warning(
-                        "Password challenge prompt reached, but password secret is not provided in environment."
+                        "Password challenge prompt reached, but AUTH_PASSWORD secret is not provided in environment."
                     )
                     break
                 logger.info("Entering password and submitting login challenge...")
+                pwd_inp.first.click()
                 pwd_inp.first.fill(password)
                 time.sleep(0.5)
                 pwd_inp.first.press("Enter")
 
-                next_btn = page.locator("#passwordNext, button:has-text('Next'), div[role='button']:has-text('Next')")
+                next_btn = page.locator("#passwordNext, button:has-text('Next'), div[role='button']:has-text('Next'), button[type='button']:has-text('Next')")
                 if next_btn.count() > 0 and next_btn.first.is_visible():
                     try:
                         next_btn.first.click()
@@ -139,7 +146,10 @@ class FormHandler:
                         pass
 
                 time.sleep(5)
-                page.wait_for_load_state("domcontentloaded")
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except Exception:
+                    pass
                 continue
 
             # 3. Check Email Field
@@ -149,6 +159,7 @@ class FormHandler:
                     logger.error("Email prompt reached but no email found in config or environment secrets.")
                     break
                 logger.info(f"Entering email '{target_email}'...")
+                email_inp.first.click()
                 email_inp.first.fill(target_email)
                 time.sleep(0.5)
                 email_inp.first.press("Enter")
@@ -161,8 +172,22 @@ class FormHandler:
                         pass
 
                 time.sleep(3)
-                page.wait_for_load_state("domcontentloaded")
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except Exception:
+                    pass
                 continue
+
+            # 4. Check intermediate prompts like "Not now", "Skip", "Continue"
+            skip_btn = page.locator("button:has-text('Not now'), div[role='button']:has-text('Not now'), button:has-text('Skip'), button:has-text('Continue')")
+            if skip_btn.count() > 0 and skip_btn.first.is_visible():
+                try:
+                    logger.info("Clicking intermediate prompt (Not now / Skip / Continue)...")
+                    skip_btn.first.click()
+                    time.sleep(3)
+                    continue
+                except Exception:
+                    pass
 
             time.sleep(2)
 
